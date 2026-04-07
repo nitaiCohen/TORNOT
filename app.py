@@ -105,133 +105,6 @@ html, body, [class*="css"] {
     border-bottom: 1px solid rgba(126,179,245,.2);
     text-align: right;
 }
-
-.week-nav {
-    background: rgba(37,99,168,.15);
-    border: 1px solid rgba(37,99,168,.3);
-    border-radius: 12px;
-    padding: 14px 20px;
-    margin-bottom: 18px;
-    text-align: center;
-}
-.week-label {
-    color: #93b4d8;
-    font-size: .85rem;
-}
-.week-dates {
-    color: #e8f0fe;
-    font-size: 1.2rem;
-    font-weight: 700;
-}
-
-.roster-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: rgba(255,255,255,0.04);
-    backdrop-filter: blur(12px);
-    border-radius: 14px;
-    overflow: hidden;
-}
-.roster-table th {
-    background: rgba(37,99,168,.45);
-    color: #7eb3f5;
-    padding: 12px 16px;
-    font-size: .9rem;
-    border-bottom: 2px solid rgba(37,99,168,.6);
-    text-align: right;
-}
-.roster-table td {
-    padding: 10px 16px;
-    border-bottom: 1px solid rgba(255,255,255,.06);
-    color: #d1dff0;
-    font-size: .9rem;
-    text-align: right;
-}
-.roster-table tr:hover td {
-    background: rgba(37,99,168,.13);
-}
-.pos-cell {
-    color: #7eb3f5;
-    font-weight: 600;
-}
-.shift-cell {
-    color: #93b4d8;
-    font-size: .85rem;
-}
-
-.badge {
-    display: inline-block;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: .78rem;
-    font-weight: 600;
-}
-.badge-done { background:#1a4731; color:#4ade80; border:1px solid #4ade80; }
-.badge-now  { background:#1e3a5f; color:#60a5fa; border:1px solid #60a5fa; }
-.badge-plan { background:#3b2a1a; color:#fb923c; border:1px solid #fb923c; }
-
-.admin-badge {
-    background: linear-gradient(90deg,#7c3aed,#5b21b6);
-    color: white;
-    padding: 4px 14px;
-    border-radius: 20px;
-    font-size: .78rem;
-    font-weight: 600;
-}
-
-.stButton>button {
-    background: linear-gradient(90deg,#2563eb,#1d4ed8);
-    border: none;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 10px;
-    font-weight: 600;
-    transition: 0.2s;
-    font-family: 'Heebo', sans-serif;
-}
-.stButton>button:hover {
-    transform: scale(1.03);
-    background: linear-gradient(90deg,#1d4ed8,#2563eb);
-}
-
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg,#0d1b2e 0%,#1a2744 100%) !important;
-    border-left: 1px solid rgba(37,99,168,.3) !important;
-}
-section[data-testid="stSidebar"] * {
-    direction: rtl;
-}
-
-.info-box {
-    background: rgba(37,99,168,.15);
-    border: 1px solid rgba(37,99,168,.35);
-    border-radius: 10px;
-    padding: 12px 18px;
-    color: #93b4d8;
-    font-size: .88rem;
-    margin: 10px 0;
-    text-align: right;
-}
-.success-box {
-    background: rgba(26,71,49,.5);
-    border: 1px solid #4ade80;
-    border-radius: 10px;
-    padding: 12px 18px;
-    color: #4ade80;
-    font-size: .88rem;
-    margin: 10px 0;
-    text-align: right;
-}
-.error-box {
-    background: rgba(127,29,29,.4);
-    border: 1px solid #f87171;
-    border-radius: 10px;
-    padding: 12px 18px;
-    color: #f87171;
-    font-size: .88rem;
-    margin: 10px 0;
-    text-align: right;
-}
 """
 
 st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
@@ -270,7 +143,6 @@ def week_status(monday: date) -> str:
 
 def row_key(position: str, shift: str) -> str:
     return f"{position}||{shift}"
-
 # ─────────────────────────────────────────────
 # SUPABASE DATA
 # ─────────────────────────────────────────────
@@ -421,15 +293,296 @@ with tabs[0]:
         </tr>
     </thead>
     <tbody>
-ניתאי, אני רואה שהקוד נחתך באמצע — וזה אומר שאם אמשיך להדביק לך את כל הקובץ הענק כאן, הוא **ישבר שוב**.  
-בוא נעשה את זה חכם: אני אתן לך **את כל הקובץ המלא, שלם, נקי, בלי חיתוכים**, אבל לפני שאני מדביק אותו — אני צריך ממך דבר אחד קטן:
+    """
 
-### ✔️ האם אתה רוצה שהקובץ יהיה:
-### **A — גרסה מלאה עם כל הפיצ'רים + כל ה־CSS + כל הטבלאות + כל השיפורים (בערך 1500 שורות)?**  
-או  
-### **B — גרסה מלאה אבל דחוסה, בלי כפילויות, קצרה יותר (בערך 700 שורות)?**
+    prev_pos = None
+    for position, shift in ROSTER_ROWS:
+        key = row_key(position, shift)
+        asgns = week_data.get(key, [])
+        disp = assignments_display(asgns)
+        pos_display = position if position != prev_pos else ""
+        prev_pos = position
 
-שניהם יעבדו מצוין.  
-ההבדל הוא רק באורך ובכמה אתה רוצה שהקוד יהיה "מופרד" וקריא.
+        table_html += f"""
+        <tr>
+            <td class="pos-cell">{pos_display}</td>
+            <td class="shift-cell">{shift}</td>
+            <td>{disp}</td>
+        </tr>
+        """
 
-ברגע שתבחר — אני מדביק לך כאן את **הקובץ המלא בשלמותו**, בלי שום חיתוך.
+    table_html += """
+    </tbody>
+    </table>
+    </div>
+    """
+
+    st.markdown(table_html, unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════
+# TAB 2 — חיפוש אישי
+# ══════════════════════════════════════════════
+with tabs[1]:
+    st.markdown(
+        '<div class="card"><div class="card-title">🔍 חיפוש תורנויות לפי שם</div>',
+        unsafe_allow_html=True,
+    )
+    search_name = st.text_input("הזן שם מלא או חלקי", placeholder="לדוגמה: כהן")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if search_name.strip():
+        all_rows = load_all()
+        found = []
+        q = search_name.strip().lower()
+
+        for r in all_rows:
+            try:
+                asgns = json.loads(r["assignments"])
+            except:
+                continue
+
+            monday = date.fromisoformat(r["week_monday"])
+
+            for a in asgns:
+                if q in a.get("name", "").lower():
+                    frm = a.get("from", "")
+                    to = a.get("to", "")
+                    period = f"{frm}–{to}" if frm and to else "כל השבוע"
+
+                    found.append({
+                        "שבוע": f"{fmt(monday)} – {fmt(monday + timedelta(days=6))}",
+                        "עמדה": r["position"],
+                        "סבב": r["shift"],
+                        "תקופה": period,
+                        "סטטוס": week_status(monday),
+                        "_monday": monday,
+                    })
+
+        if not found:
+            st.markdown(
+                f'<div class="error-box">לא נמצאו תורנויות עבור "{search_name}".</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div class="success-box">נמצאו {len(found)} תורנויות עבור "{search_name}"</div>',
+                unsafe_allow_html=True,
+            )
+
+            table_html = """
+            <div class="card">
+            <table class="roster-table">
+            <thead>
+                <tr>
+                    <th>שבוע</th>
+                    <th>עמדה</th>
+                    <th>סבב</th>
+                    <th>תקופה</th>
+                    <th>סטטוס</th>
+                </tr>
+            </thead>
+            <tbody>
+            """
+
+            for f in sorted(found, key=lambda x: x["_monday"], reverse=True):
+                bc = {
+                    "בוצע": "badge-done",
+                    "נוכחי": "badge-now",
+                    "מתוכנן": "badge-plan",
+                }[f["סטטוס"]]
+
+                table_html += f"""
+                <tr>
+                    <td>{f['שבוע']}</td>
+                    <td>{f['עמדה']}</td>
+                    <td>{f['סבב']}</td>
+                    <td>{f['תקופה']}</td>
+                    <td><span class='badge {bc}'>{f['סטטוס']}</span></td>
+                </tr>
+                """
+
+            table_html += "</tbody></table></div>"
+            st.markdown(table_html, unsafe_allow_html=True)
+            # ══════════════════════════════════════════════
+# TAB 3 — שיבוץ (מנהל)
+# ══════════════════════════════════════════════
+if st.session_state.is_admin:
+    with tabs[2]:
+        week_data = load_week(current_monday.isoformat())
+        future = is_future(current_monday)
+
+        st.markdown(f"""
+        <div class="card">
+            <div class="card-title">✏️ שיבוץ שבועי — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if future:
+            st.markdown(
+                '<div class="info-box">📅 שבוע עתידי — שיבוץ לתכנון</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("#### בחר עמדה וסבב לשיבוץ")
+        row_options = [f"{pos} | {shft}" for pos, shft in ROSTER_ROWS]
+        selected_row_str = st.selectbox("עמדה | סבב", row_options)
+        sel_idx = row_options.index(selected_row_str)
+        sel_pos, sel_shift = ROSTER_ROWS[sel_idx]
+        sel_key = row_key(sel_pos, sel_shift)
+        current_assignments = week_data.get(sel_key, [])
+
+        if current_assignments:
+            st.markdown(
+                f'<div class="info-box">שיבוץ נוכחי: <strong>{assignments_display(current_assignments)}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="info-box">אין שיבוץ לסבב זה עדיין</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
+
+        use_split = st.toggle("פיצול שמירה (יותר מחייל אחד בסבב זה)", value=False)
+        new_assignments = []
+        split_valid = True
+
+        if not use_split:
+            st.markdown("#### שיבוץ לכל השבוע")
+            soldier = st.text_input("שם החייל")
+            if soldier.strip():
+                new_assignments = [{"name": soldier.strip()}]
+
+        else:
+            st.markdown("#### שיבוץ עם פיצול")
+            num_splits = st.number_input(
+                "כמה חיילים בפיצול?",
+                min_value=2,
+                max_value=7,
+                value=2,
+                step=1,
+            )
+
+            day_options = [f"{DAYS_HE[j]} {fmt(week_dates[j])}" for j in range(7)]
+
+            for i in range(int(num_splits)):
+                st.markdown(f"**חייל {i+1}:**")
+                sc1, sc2, sc3 = st.columns(3)
+
+                with sc1:
+                    sname = st.text_input("שם", key=f"split_name_{i}")
+
+                with sc2:
+                    from_day = st.selectbox(
+                        "מתאריך",
+                        day_options,
+                        key=f"split_from_{i}",
+                        index=min(i, 6),
+                    )
+
+                with sc3:
+                    to_day = st.selectbox(
+                        "עד תאריך",
+                        day_options,
+                        key=f"split_to_{i}",
+                        index=min(i + 1, 6),
+                    )
+
+                from_idx = day_options.index(from_day)
+                to_idx = day_options.index(to_day)
+
+                if to_idx < from_idx:
+                    st.markdown(
+                        '<div class="error-box">⚠️ תאריך הסיום חייב להיות אחרי תאריך ההתחלה</div>',
+                        unsafe_allow_html=True,
+                    )
+                    split_valid = False
+
+                if sname.strip():
+                    new_assignments.append({
+                        "name": sname.strip(),
+                        "from": fmt(week_dates[from_idx]),
+                        "to": fmt(week_dates[to_idx]),
+                    })
+                else:
+                    split_valid = False
+
+            if not split_valid and any(a.get("name") for a in new_assignments):
+                st.markdown(
+                    '<div class="error-box">מלא את כל השדות לפני השמירה</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("---")
+
+        btn1, btn2 = st.columns(2)
+
+        with btn1:
+            if st.button("💾 שמור שיבוץ", use_container_width=True):
+                if not new_assignments:
+                    st.error("יש למלא לפחות חייל אחד")
+                elif use_split and not split_valid:
+                    st.error("יש לתקן את שדות הפיצול לפני השמירה")
+                else:
+                    save_row(current_monday, sel_pos, sel_shift, new_assignments)
+                    st.success("השיבוץ נשמר בהצלחה")
+                    st.rerun()
+
+        with btn2:
+            if st.button("🗑️ נקה שיבוץ", use_container_width=True):
+                delete_row(current_monday, sel_pos, sel_shift)
+                st.success("השיבוץ נמחק")
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("#### סיכום שיבוצים לשבוע זה")
+
+        week_data = load_week(current_monday.isoformat())
+
+        table_html = """
+        <div class="card">
+        <table class="roster-table">
+        <thead>
+            <tr>
+                <th>עמדה</th>
+                <th>סבב</th>
+                <th>חייל</th>
+            </tr>
+        </thead>
+        <tbody>
+        """
+
+        prev_p = None
+        for position, shift in ROSTER_ROWS:
+            key = row_key(position, shift)
+            asgns = week_data.get(key, [])
+            disp = assignments_display(asgns)
+
+            if disp == "—":
+                continue
+
+            pos_d = position if position != prev_p else ""
+            prev_p = position
+
+            table_html += f"""
+            <tr>
+                <td class='pos-cell'>{pos_d}</td>
+                <td class='shift-cell'>{shift}</td>
+                <td>{disp}</td>
+            </tr>
+            """
+
+        table_html += "</tbody></table></div>"
+        st.markdown(table_html, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────
+# FOOTER
+# ─────────────────────────────────────────────
+st.markdown("---")
+st.markdown(
+    '<div style="text-align:center;color:rgba(255,255,255,.25);font-size:.78rem;padding:10px 0">'
+    'מערכת ניהול תורנויות • גזרה אזרחית'
+    '</div>',
+    unsafe_allow_html=True,
+)
