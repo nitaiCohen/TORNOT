@@ -539,42 +539,6 @@ if st.session_state.is_admin:
 
         week_data = load_week(current_monday.isoformat())
 
-        table_html = """
-        <div class="card">
-        <table class="roster-table">
-        <thead>
-            <tr>
-                <th>עמדה</th>
-                <th>סבב</th>
-                <th>חייל</th>
-            </tr>
-        </thead>
-        <tbody>
-        """
-
-        prev_p = None
-        for position, shift in ROSTER_ROWS:
-            key = row_key(position, shift)
-            asgns = week_data.get(key, [])
-            disp = assignments_display(asgns)
-
-            if disp == "—":
-                continue
-
-            pos_d = position if position != prev_p else ""
-            prev_p = position
-
-            table_html += f"""
-            <tr>
-                <td class='pos-cell'>{pos_d}</td>
-                <td class='shift-cell'>{shift}</td>
-                <td>{disp}</td>
-            </tr>
-            """
-
-        table_html += "</tbody></table></div>"
-        st.markdown(table_html, unsafe_allow_html=True)
-
 # ─────────────────────────────────────────────
 # FOOTER
 # ─────────────────────────────────────────────
