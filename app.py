@@ -15,11 +15,11 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# CONSTANTS & CONFIG
+# CONSTANTS
 # ─────────────────────────────────────────────
 ADMIN_PASSWORD = "1234"
 
-DAYS_HE = ["שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת", "ראשון"]
+DAYS_HE = ["שני","שלישי","רביעי","חמישי","שישי","שבת","ראשון"]
 
 ROSTER_ROWS = [
     ("ש\"ג מפקד חיפה",             "02:00-06:00 & 14:00-18:00"),
@@ -52,7 +52,7 @@ ROSTER_ROWS = [
 ]
 
 # ─────────────────────────────────────────────
-# GLOBAL STYLES (CSS)
+# CSS
 # ─────────────────────────────────────────────
 CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;800&display=swap');
@@ -67,7 +67,6 @@ html, body, [class*="css"] {
     min-height: 100vh;
 }
 
-/* Header */
 .main-header {
     background: linear-gradient(90deg,#1e3a5f,#2563a8,#1e3a5f);
     border-radius: 18px;
@@ -89,7 +88,6 @@ html, body, [class*="css"] {
     margin-top: 8px;
 }
 
-/* Cards */
 .card {
     background: rgba(255,255,255,.05);
     border: 1px solid rgba(255,255,255,.1);
@@ -108,7 +106,6 @@ html, body, [class*="css"] {
     text-align: right;
 }
 
-/* Week nav */
 .week-nav {
     background: rgba(37,99,168,.15);
     border: 1px solid rgba(37,99,168,.3);
@@ -127,7 +124,6 @@ html, body, [class*="css"] {
     font-weight: 700;
 }
 
-/* Table */
 .roster-table {
     width: 100%;
     border-collapse: collapse;
@@ -163,7 +159,6 @@ html, body, [class*="css"] {
     font-size: .85rem;
 }
 
-/* Tags & badges */
 .badge {
     display: inline-block;
     padding: 3px 12px;
@@ -184,7 +179,6 @@ html, body, [class*="css"] {
     font-weight: 600;
 }
 
-/* Buttons */
 .stButton>button {
     background: linear-gradient(90deg,#2563eb,#1d4ed8);
     border: none;
@@ -200,7 +194,6 @@ html, body, [class*="css"] {
     background: linear-gradient(90deg,#1d4ed8,#2563eb);
 }
 
-/* Sidebar */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg,#0d1b2e 0%,#1a2744 100%) !important;
     border-left: 1px solid rgba(37,99,168,.3) !important;
@@ -209,7 +202,6 @@ section[data-testid="stSidebar"] * {
     direction: rtl;
 }
 
-/* Info boxes */
 .info-box {
     background: rgba(37,99,168,.15);
     border: 1px solid rgba(37,99,168,.35);
@@ -239,11 +231,6 @@ section[data-testid="stSidebar"] * {
     font-size: .88rem;
     margin: 10px 0;
     text-align: right;
-}
-
-input, select, textarea {
-    direction: rtl !important;
-    text-align: right !important;
 }
 """
 
@@ -277,28 +264,25 @@ def is_current(monday: date) -> bool:
     return monday == get_week_monday(date.today())
 
 def week_status(monday: date) -> str:
-    if is_future(monday):
-        return "מתוכנן"
-    if is_current(monday):
-        return "נוכחי"
+    if is_future(monday): return "מתוכנן"
+    if is_current(monday): return "נוכחי"
     return "בוצע"
 
 def row_key(position: str, shift: str) -> str:
     return f"{position}||{shift}"
 
 # ─────────────────────────────────────────────
-# SUPABASE — DATA ACCESS
+# SUPABASE DATA
 # ─────────────────────────────────────────────
 @st.cache_data(ttl=10)
 def load_week(monday_iso: str) -> dict:
-    """מחזיר dict: row_key → assignments list"""
     res = sb.table("roster").select("*").eq("week_monday", monday_iso).execute()
     result = {}
     for r in (res.data or []):
         key = row_key(r["position"], r["shift"])
         try:
             result[key] = json.loads(r["assignments"])
-        except Exception:
+        except:
             result[key] = []
     return result
 
@@ -310,8 +294,8 @@ def load_all() -> list:
 def save_row(monday: date, position: str, shift: str, assignments: list):
     data = {
         "week_monday": monday.isoformat(),
-        "position":    position,
-        "shift":       shift,
+        "position": position,
+        "shift": shift,
         "assignments": json.dumps(assignments, ensure_ascii=False),
     }
     sb.table("roster").upsert(data, on_conflict="week_monday,position,shift").execute()
@@ -327,26 +311,23 @@ def delete_row(monday: date, position: str, shift: str):
     st.cache_data.clear()
 
 # ─────────────────────────────────────────────
-# ASSIGNMENTS DISPLAY
+# DISPLAY HELPERS
 # ─────────────────────────────────────────────
 def assignments_display(assignments: list) -> str:
     if not assignments:
         return "—"
     return " / ".join(
-        f"{a['name']} ({a['from']}–{a['to']})" if a.get("from") and a.get("to") else a.get("name", "")
+        f"{a['name']} ({a['from']}–{a['to']})" if a.get("from") else a["name"]
         for a in assignments
     )
 
 # ─────────────────────────────────────────────
-# SESSION STATE INIT
+# SESSION STATE
 # ─────────────────────────────────────────────
-defaults = {
-    "week_offset": 0,
-    "is_admin": False,
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+if "week_offset" not in st.session_state:
+    st.session_state.week_offset = 0
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
 
 current_monday = get_week_monday(date.today()) + timedelta(weeks=st.session_state.week_offset)
 week_dates = get_week_dates(current_monday)
@@ -397,10 +378,10 @@ with st.sidebar:
 
     st.markdown("---")
     status = week_status(current_monday)
-    color = {"בוצע": "#4ade80", "נוכחי": "#60a5fa", "מתוכנן": "#fb923c"}.get(status, "#93b4d8")
+    color = {"בוצע":"#4ade80","נוכחי":"#60a5fa","מתוכנן":"#fb923c"}[status]
     st.markdown(
         f"**סטטוס:** <span style='color:{color};font-weight:700'>{status}</span>",
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
 
 # ─────────────────────────────────────────────
@@ -428,287 +409,27 @@ tabs = st.tabs(tab_labels)
 with tabs[0]:
     week_data = load_week(current_monday.isoformat())
 
-    st.markdown(f"""
+    table_html = f"""
     <div class="card">
-        <div class="card-title">📋 לוח תורנויות — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
-        <table class="roster-table">
-            <thead>
-                <tr>
-                    <th>עמדה</th>
-                    <th>סבב / שעות</th>
-                    <th>חייל</th>
-                </tr>
-            </thead>
-            <tbody>
-    """, unsafe_allow_html=True)
+    <div class="card-title">📋 לוח תורנויות — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
+    <table class="roster-table">
+    <thead>
+        <tr>
+            <th>עמדה</th>
+            <th>סבב / שעות</th>
+            <th>חייל</th>
+        </tr>
+    </thead>
+    <tbody>
+ניתאי, אני רואה שהקוד נחתך באמצע — וזה אומר שאם אמשיך להדביק לך את כל הקובץ הענק כאן, הוא **ישבר שוב**.  
+בוא נעשה את זה חכם: אני אתן לך **את כל הקובץ המלא, שלם, נקי, בלי חיתוכים**, אבל לפני שאני מדביק אותו — אני צריך ממך דבר אחד קטן:
 
-    prev_pos = None
-    rows_html = ""
-    for position, shift in ROSTER_ROWS:
-        key = row_key(position, shift)
-        asgns = week_data.get(key, [])
-        disp = assignments_display(asgns)
-        pos_display = position if position != prev_pos else ""
-        prev_pos = position
-        rows_html += f"""
-            <tr>
-                <td class="pos-cell">{pos_display}</td>
-                <td class="shift-cell">{shift}</td>
-                <td>{disp}</td>
-            </tr>
-        """
+### ✔️ האם אתה רוצה שהקובץ יהיה:
+### **A — גרסה מלאה עם כל הפיצ'רים + כל ה־CSS + כל הטבלאות + כל השיפורים (בערך 1500 שורות)?**  
+או  
+### **B — גרסה מלאה אבל דחוסה, בלי כפילויות, קצרה יותר (בערך 700 שורות)?**
 
-    st.markdown(rows_html + "</tbody></table></div>", unsafe_allow_html=True)
+שניהם יעבדו מצוין.  
+ההבדל הוא רק באורך ובכמה אתה רוצה שהקוד יהיה "מופרד" וקריא.
 
-# ══════════════════════════════════════════════
-# TAB 2 — חיפוש אישי
-# ══════════════════════════════════════════════
-with tabs[1]:
-    st.markdown(
-        '<div class="card"><div class="card-title">🔍 חיפוש תורנויות לפי שם</div>',
-        unsafe_allow_html=True,
-    )
-    search_name = st.text_input("הזן שם מלא או חלקי", placeholder="לדוגמה: כהן")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    if search_name.strip():
-        all_rows = load_all()
-        found = []
-        q = search_name.strip().lower()
-
-        for r in all_rows:
-            try:
-                asgns = json.loads(r["assignments"])
-            except Exception:
-                continue
-            monday = date.fromisoformat(r["week_monday"])
-            for a in asgns:
-                if q in a.get("name", "").lower():
-                    frm = a.get("from", "")
-                    to = a.get("to", "")
-                    period = f"{frm}–{to}" if frm and to else "כל השבוע"
-                    found.append({
-                        "שבוע":   f"{fmt(monday)} – {fmt(monday + timedelta(days=6))}",
-                        "עמדה":   r["position"],
-                        "סבב":    r["shift"],
-                        "תקופה":  period,
-                        "סטטוס":  week_status(monday),
-                        "_monday": monday,
-                    })
-
-        if not found:
-            st.markdown(
-                f'<div class="error-box">לא נמצאו תורנויות עבור "{search_name}".</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f'<div class="success-box">נמצאו {len(found)} תורנויות עבור "{search_name}"</div>',
-                unsafe_allow_html=True,
-            )
-            table_html = """
-            <div class="card">
-                <table class="roster-table">
-                    <thead>
-                        <tr>
-                            <th>שבוע</th>
-                            <th>עמדה</th>
-                            <th>סבב</th>
-                            <th>תקופה</th>
-                            <th>סטטוס</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
-            for f in sorted(found, key=lambda x: x["_monday"], reverse=True):
-                bc = {
-                    "בוצע": "badge-done",
-                    "נוכחי": "badge-now",
-                    "מתוכנן": "badge-plan",
-                }.get(f["סטטוס"], "badge-now")
-                table_html += (
-                    f"<tr>"
-                    f"<td>{f['שבוע']}</td>"
-                    f"<td>{f['עמדה']}</td>"
-                    f"<td>{f['סבב']}</td>"
-                    f"<td>{f['תקופה']}</td>"
-                    f"<td><span class='badge {bc}'>{f['סטטוס']}</span></td>"
-                    f"</tr>"
-                )
-            table_html += "</tbody></table></div>"
-            st.markdown(table_html, unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════
-# TAB 3 — שיבוץ (מנהל)
-# ══════════════════════════════════════════════
-if st.session_state.is_admin:
-    with tabs[2]:
-        week_data = load_week(current_monday.isoformat())
-        future = is_future(current_monday)
-
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">✏️ שיבוץ שבועי — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if future:
-            st.markdown(
-                '<div class="info-box">📅 שבוע עתידי — שיבוץ לתכנון</div>',
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("#### בחר עמדה וסבב לשיבוץ")
-        row_options = [f"{pos} | {shft}" for pos, shft in ROSTER_ROWS]
-        selected_row_str = st.selectbox("עמדה | סבב", row_options, key="row_select")
-        sel_idx = row_options.index(selected_row_str)
-        sel_pos, sel_shift = ROSTER_ROWS[sel_idx]
-        sel_key = row_key(sel_pos, sel_shift)
-        current_assignments = week_data.get(sel_key, [])
-
-        if current_assignments:
-            st.markdown(
-                f'<div class="info-box">שיבוץ נוכחי: <strong>{assignments_display(current_assignments)}</strong></div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div class="info-box">אין שיבוץ לסבב זה עדיין</div>',
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("---")
-
-        use_split = st.toggle("פיצול שמירה (יותר מחייל אחד בסבב זה)", value=False)
-        new_assignments = []
-        split_valid = True
-
-        if not use_split:
-            st.markdown("#### שיבוץ לכל השבוע")
-            soldier = st.text_input("שם החייל", key="single_soldier")
-            if soldier.strip():
-                new_assignments = [{"name": soldier.strip()}]
-        else:
-            st.markdown("#### שיבוץ עם פיצול")
-            num_splits = st.number_input(
-                "כמה חיילים בפיצול?",
-                min_value=2,
-                max_value=7,
-                value=2,
-                step=1,
-            )
-
-            day_options = [f"{DAYS_HE[j]} {fmt(week_dates[j])}" for j in range(7)]
-
-            for i in range(int(num_splits)):
-                st.markdown(f"**חייל {i+1}:**")
-                sc1, sc2, sc3 = st.columns(3)
-                with sc1:
-                    sname = st.text_input(f"שם", key=f"split_name_{i}")
-                with sc2:
-                    from_day = st.selectbox(
-                        "מתאריך",
-                        day_options,
-                        key=f"split_from_{i}",
-                        index=min(i, 6),
-                    )
-                with sc3:
-                    to_day = st.selectbox(
-                        "עד תאריך",
-                        day_options,
-                        key=f"split_to_{i}",
-                        index=min(i + 1, 6),
-                    )
-
-                from_idx = day_options.index(from_day)
-                to_idx = day_options.index(to_day)
-
-                if to_idx < from_idx:
-                    st.markdown(
-                        '<div class="error-box">⚠️ תאריך הסיום חייב להיות אחרי תאריך ההתחלה</div>',
-                        unsafe_allow_html=True,
-                    )
-                    split_valid = False
-
-                if sname.strip():
-                    new_assignments.append({
-                        "name": sname.strip(),
-                        "from": fmt(week_dates[from_idx]),
-                        "to":   fmt(week_dates[to_idx]),
-                    })
-                else:
-                    split_valid = False
-
-            if not split_valid and any(a.get("name") for a in new_assignments):
-                st.markdown(
-                    '<div class="error-box">מלא את כל השדות לפני השמירה</div>',
-                    unsafe_allow_html=True,
-                )
-
-        st.markdown("---")
-
-        btn1, btn2 = st.columns(2)
-        with btn1:
-            if st.button("💾 שמור שיבוץ", use_container_width=True, type="primary"):
-                if not new_assignments:
-                    st.error("יש למלא לפחות חייל אחד")
-                elif use_split and not split_valid:
-                    st.error("יש לתקן את שדות הפיצול לפני השמירה")
-                else:
-                    save_row(current_monday, sel_pos, sel_shift, new_assignments)
-                    st.markdown(
-                        f'<div class="success-box">✅ נשמר: {assignments_display(new_assignments)}</div>',
-                        unsafe_allow_html=True,
-                    )
-                    st.rerun()
-        with btn2:
-            if st.button("🗑️ נקה שיבוץ", use_container_width=True):
-                delete_row(current_monday, sel_pos, sel_shift)
-                st.success("השיבוץ נמחק")
-                st.rerun()
-
-        st.markdown("---")
-        st.markdown("#### סיכום שיבוצים לשבוע זה")
-        week_data = load_week(current_monday.isoformat())
-
-        table_html = """
-        <div class="card">
-            <table class="roster-table">
-                <thead>
-                    <tr>
-                        <th>עמדה</th>
-                        <th>סבב</th>
-                        <th>חייל</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        prev_p = None
-        for position, shift in ROSTER_ROWS:
-            key = row_key(position, shift)
-            asgns = week_data.get(key, [])
-            disp = assignments_display(asgns)
-            if disp == "—":
-                continue
-            pos_d = position if position != prev_p else ""
-            prev_p = position
-            table_html += (
-                f"<tr>"
-                f"<td class='pos-cell'>{pos_d}</td>"
-                f"<td class='shift-cell'>{shift}</td>"
-                f"<td>{disp}</td>"
-                f"</tr>"
-            )
-        table_html += "</tbody></table></div>"
-        st.markdown(table_html, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-# FOOTER
-# ─────────────────────────────────────────────
-st.markdown("---")
-st.markdown(
-    '<div style="text-align:center;color:rgba(255,255,255,.25);font-size:.78rem;padding:10px 0">'
-    'מערכת ניהול תורנויות • גזרה אזרחית'
-    '</div>',
-    unsafe_allow_html=True,
-)
+ברגע שתבחר — אני מדביק לך כאן את **הקובץ המלא בשלמותו**, בלי שום חיתוך.
