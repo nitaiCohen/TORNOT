@@ -105,6 +105,117 @@ html, body, [class*="css"] {
     border-bottom: 1px solid rgba(126,179,245,.2);
     text-align: right;
 }
+
+/* ── Roster table ── */
+.roster-table {
+    width: 100%;
+    border-collapse: collapse;
+    direction: rtl;
+    font-size: 0.92rem;
+}
+.roster-table thead tr {
+    background: rgba(37,99,168,.35);
+}
+.roster-table th {
+    color: #93b4d8;
+    font-weight: 700;
+    padding: 10px 14px;
+    text-align: right;
+    border-bottom: 2px solid rgba(37,99,168,.5);
+    white-space: nowrap;
+}
+.roster-table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    color: #dde8f8;
+    vertical-align: middle;
+}
+.roster-table tbody tr:hover {
+    background: rgba(37,99,168,.15);
+}
+.pos-cell {
+    color: #7eb3f5 !important;
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 160px;
+}
+.shift-cell {
+    color: #a8c4e8 !important;
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+/* ── Week nav ── */
+.week-nav {
+    background: rgba(37,99,168,.2);
+    border: 1px solid rgba(37,99,168,.4);
+    border-radius: 10px;
+    padding: 10px 14px;
+    text-align: center;
+    margin-top: 8px;
+}
+.week-label {
+    color: #93b4d8;
+    font-size: 0.78rem;
+    margin-bottom: 4px;
+}
+.week-dates {
+    color: #e8f0fe;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+/* ── Admin badge ── */
+.admin-badge {
+    background: rgba(74,222,128,.15);
+    border: 1px solid rgba(74,222,128,.4);
+    color: #4ade80;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    display: inline-block;
+}
+
+/* ── Info / success / error boxes ── */
+.info-box {
+    background: rgba(96,165,250,.1);
+    border: 1px solid rgba(96,165,250,.35);
+    color: #93c5fd;
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin: 8px 0;
+    font-size: 0.9rem;
+}
+.success-box {
+    background: rgba(74,222,128,.1);
+    border: 1px solid rgba(74,222,128,.35);
+    color: #86efac;
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin: 8px 0;
+    font-size: 0.9rem;
+}
+.error-box {
+    background: rgba(248,113,113,.1);
+    border: 1px solid rgba(248,113,113,.35);
+    color: #fca5a5;
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin: 8px 0;
+    font-size: 0.9rem;
+}
+
+/* ── Status badges ── */
+.badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-block;
+}
+.badge-done  { background: rgba(74,222,128,.15); color: #4ade80; border: 1px solid rgba(74,222,128,.4); }
+.badge-now   { background: rgba(96,165,250,.15); color: #60a5fa; border: 1px solid rgba(96,165,250,.4); }
+.badge-plan  { background: rgba(251,146,60,.15);  color: #fb923c; border: 1px solid rgba(251,146,60,.4); }
 """
 
 st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
