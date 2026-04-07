@@ -1,220 +1,714 @@
 import streamlit as st
 import pandas as pd
-import os
-from datetime import datetime, timedelta
+from datetime import timedelta, date
+from supabase import create_client, Client
+import json
 
-# --- הגדרות בסיסיות ---
-st.set_page_config(page_title="ניהול תורנויות - גזרה אזרחית", layout="wide")
+# ─────────────────────────────────────────────
+# PAGE CONFIG
+# ─────────────────────────────────────────────
+st.set_page_config(
+    page_title="מערכת ניהול תורנויות",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-DB_DIR = "archive"
-if not os.path.exists(DB_DIR):
-    os.makedirs(DB_DIR)
-
-SETTINGS_FILE = "shift_settings.csv"
+# ─────────────────────────────────────────────
+# CONSTANTS & CONFIG
+# ─────────────────────────────────────────────
 ADMIN_PASSWORD = "1234"
 
-# --- פונקציות עזר לתאריכים ---
-def get_monday_to_monday(date_obj):
-    monday = date_obj - timedelta(days=date_obj.weekday())
-    next_monday = monday + timedelta(days=7)
-    return monday.strftime("%d.%m.%Y"), next_monday.strftime("%d.%m.%Y"), monday.strftime("%Y-%m-%d")
+DAYS_HE = ["שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת", "ראשון"]
 
-@st.cache_data(ttl=600)
-def load_settings():
-    if os.path.exists(SETTINGS_FILE):
+ROSTER_ROWS = [
+    ("ש\"ג מפקד חיפה",             "02:00-06:00 & 14:00-18:00"),
+    ("ש\"ג מפקד חיפה",             "06:00-10:00 & 18:00-22:00"),
+    ("ש\"ג מפקד חיפה",             "10:00-14:00 & 22:00-02:00"),
+    ("סגן מפקד חיפה",              "02:00-06:00 & 14:00-18:00"),
+    ("סגן מפקד חיפה",              "06:00-10:00 & 18:00-22:00"),
+    ("סגן מפקד חיפה",              "10:00-14:00 & 22:00-02:00"),
+    ("עמדה אחורית חיפה",           "02:00-06:00 & 14:00-18:00"),
+    ("עמדה אחורית חיפה",           "06:00-10:00 & 18:00-22:00"),
+    ("עמדה אחורית חיפה",           "10:00-14:00 & 22:00-02:00"),
+    ("ש\"ג מפקדת רכבת",            "06:00-10:00 & 14:00-18:00"),
+    ("ש\"ג מפקדת רכבת",            "10:00-14:00 & 18:00-22:00"),
+    ("סגן רכבת",                   "06:00-10:00 & 14:00-18:00"),
+    ("סגן רכבת",                   "10:00-14:00 & 18:00-22:00"),
+    ("מחפה קדמי חיפה (ללא סופ\"ש)","18:00-22:00"),
+    ("מחפה קדמי חיפה (ללא סופ\"ש)","22:00-02:00"),
+    ("מחפה קדמי חיפה (ללא סופ\"ש)","02:00-06:00"),
+    ("מחפה אחורי חיפה (סופ\"ש)",   "02:00-06:00 & 14:00-18:00"),
+    ("מחפה אחורי חיפה (סופ\"ש)",   "06:00-10:00 & 18:00-22:00"),
+    ("מחפה אחורי חיפה (סופ\"ש)",   "10:00-14:00 & 22:00-02:00"),
+    ("חשבשבת 1",                   "06:00-18:00"),
+    ("חשבשבת 2",                   "18:00-06:00"),
+    ("מאייש חול",                  "א-ה (תורן 1)"),
+    ("מאייש חול",                  "א-ה (תורן 2)"),
+    ("מאייש סופ\"ש",               "ה-א (תורן 1)"),
+    ("מאייש סופ\"ש",               "ה-א (תורן 2)"),
+    ("כונן סמל",                   "24/7"),
+    ("כונן רב\"ט",                 "24/7"),
+]
+
+# ─────────────────────────────────────────────
+# GLOBAL STYLES (CSS)
+# ─────────────────────────────────────────────
+CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Heebo', sans-serif;
+    direction: rtl;
+}
+
+.stApp {
+    background: linear-gradient(135deg,#0f1923 0%,#1a2744 50%,#0f1923 100%);
+    min-height: 100vh;
+}
+
+/* Header */
+.main-header {
+    background: linear-gradient(90deg,#1e3a5f,#2563a8,#1e3a5f);
+    border-radius: 18px;
+    padding: 30px 40px;
+    margin-bottom: 30px;
+    border: 1px solid #2563a8;
+    box-shadow: 0 8px 32px rgba(37,99,168,.3);
+    text-align: center;
+}
+.main-header h1 {
+    color: #e8f0fe;
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin: 0;
+    text-shadow: 0 0 12px rgba(37,99,168,0.6);
+}
+.main-header p {
+    color: #93b4d8;
+    margin-top: 8px;
+}
+
+/* Cards */
+.card {
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(12px);
+}
+.card-title {
+    color: #7eb3f5;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(126,179,245,.2);
+    text-align: right;
+}
+
+/* Week nav */
+.week-nav {
+    background: rgba(37,99,168,.15);
+    border: 1px solid rgba(37,99,168,.3);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 18px;
+    text-align: center;
+}
+.week-label {
+    color: #93b4d8;
+    font-size: .85rem;
+}
+.week-dates {
+    color: #e8f0fe;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+/* Table */
+.roster-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(12px);
+    border-radius: 14px;
+    overflow: hidden;
+}
+.roster-table th {
+    background: rgba(37,99,168,.45);
+    color: #7eb3f5;
+    padding: 12px 16px;
+    font-size: .9rem;
+    border-bottom: 2px solid rgba(37,99,168,.6);
+    text-align: right;
+}
+.roster-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    color: #d1dff0;
+    font-size: .9rem;
+    text-align: right;
+}
+.roster-table tr:hover td {
+    background: rgba(37,99,168,.13);
+}
+.pos-cell {
+    color: #7eb3f5;
+    font-weight: 600;
+}
+.shift-cell {
+    color: #93b4d8;
+    font-size: .85rem;
+}
+
+/* Tags & badges */
+.badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+}
+.badge-done { background:#1a4731; color:#4ade80; border:1px solid #4ade80; }
+.badge-now  { background:#1e3a5f; color:#60a5fa; border:1px solid #60a5fa; }
+.badge-plan { background:#3b2a1a; color:#fb923c; border:1px solid #fb923c; }
+
+.admin-badge {
+    background: linear-gradient(90deg,#7c3aed,#5b21b6);
+    color: white;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+}
+
+/* Buttons */
+.stButton>button {
+    background: linear-gradient(90deg,#2563eb,#1d4ed8);
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-weight: 600;
+    transition: 0.2s;
+    font-family: 'Heebo', sans-serif;
+}
+.stButton>button:hover {
+    transform: scale(1.03);
+    background: linear-gradient(90deg,#1d4ed8,#2563eb);
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg,#0d1b2e 0%,#1a2744 100%) !important;
+    border-left: 1px solid rgba(37,99,168,.3) !important;
+}
+section[data-testid="stSidebar"] * {
+    direction: rtl;
+}
+
+/* Info boxes */
+.info-box {
+    background: rgba(37,99,168,.15);
+    border: 1px solid rgba(37,99,168,.35);
+    border-radius: 10px;
+    padding: 12px 18px;
+    color: #93b4d8;
+    font-size: .88rem;
+    margin: 10px 0;
+    text-align: right;
+}
+.success-box {
+    background: rgba(26,71,49,.5);
+    border: 1px solid #4ade80;
+    border-radius: 10px;
+    padding: 12px 18px;
+    color: #4ade80;
+    font-size: .88rem;
+    margin: 10px 0;
+    text-align: right;
+}
+.error-box {
+    background: rgba(127,29,29,.4);
+    border: 1px solid #f87171;
+    border-radius: 10px;
+    padding: 12px 18px;
+    color: #f87171;
+    font-size: .88rem;
+    margin: 10px 0;
+    text-align: right;
+}
+
+input, select, textarea {
+    direction: rtl !important;
+    text-align: right !important;
+}
+"""
+
+st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────
+# SUPABASE CLIENT
+# ─────────────────────────────────────────────
+@st.cache_resource
+def get_supabase() -> Client:
+    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+
+sb = get_supabase()
+
+# ─────────────────────────────────────────────
+# DATE HELPERS
+# ─────────────────────────────────────────────
+def get_week_monday(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+def get_week_dates(monday: date):
+    return [monday + timedelta(days=i) for i in range(7)]
+
+def fmt(d: date) -> str:
+    return d.strftime("%d/%m/%Y")
+
+def is_future(monday: date) -> bool:
+    return monday > get_week_monday(date.today())
+
+def is_current(monday: date) -> bool:
+    return monday == get_week_monday(date.today())
+
+def week_status(monday: date) -> str:
+    if is_future(monday):
+        return "מתוכנן"
+    if is_current(monday):
+        return "נוכחי"
+    return "בוצע"
+
+def row_key(position: str, shift: str) -> str:
+    return f"{position}||{shift}"
+
+# ─────────────────────────────────────────────
+# SUPABASE — DATA ACCESS
+# ─────────────────────────────────────────────
+@st.cache_data(ttl=10)
+def load_week(monday_iso: str) -> dict:
+    """מחזיר dict: row_key → assignments list"""
+    res = sb.table("roster").select("*").eq("week_monday", monday_iso).execute()
+    result = {}
+    for r in (res.data or []):
+        key = row_key(r["position"], r["shift"])
         try:
-            df = pd.read_csv(SETTINGS_FILE)
-            if not df.empty:
-                return {row['עמדה']: [row['שעות'], row['כמות']] for _, row in df.iterrows()}
-        except: pass
-    
-    return {
-        "ש\"ג מפקד חיפה": ["02:00-06:00 & 14:00-18:00, 06:00-10:00 & 18:00-22:00, 10:00-14:00 & 22:00-02:00", 1],
-        "סגן מפקד חיפה": ["02:00-06:00 & 14:00-18:00, 06:00-10:00 & 18:00-22:00, 10:00-14:00 & 22:00-02:00", 1],
-        "עמדה אחורית חיפה": ["02:00-06:00 & 14:00-18:00, 06:00-10:00 & 18:00-22:00, 10:00-14:00 & 22:00-02:00", 1],
-        "ש\"ג מפקדת רכבת": ["06:00-10:00 & 14:00-18:00, 10:00-14:00 & 18:00-22:00", 1],
-        "סגן רכבת": ["06:00-10:00 & 14:00-18:00, 10:00-14:00 & 18:00-22:00", 1],
-        "מחפה קדמי חיפה (ללא סופש)": ["18:00-22:00, 22:00-02:00, 02:00-06:00", 1],
-        "מחפה אחורי חיפה (סופ\"ש)": ["02:00-06:00 & 14:00-18:00, 06:00-10:00 & 18:00-22:00, 10:00-14:00 & 22:00-02:00", 1],
-        "חשבשבת 1": ["06:00-18:00", 1],
-        "חשבשבת 2": ["18:00-06:00", 1],
-        "מאייש חול": ["א-ה", 2], 
-        "מאייש סופ\"ש": ["ה-א", 2],
-        "כונן סמל": ["24/7", 1],
-        "כונן רב\"ט": ["24/7", 1]
-    }
+            result[key] = json.loads(r["assignments"])
+        except Exception:
+            result[key] = []
+    return result
 
-def save_settings(settings_dict):
-    data = [{"עמדה": k, "שעות": v[0], "כמות": v[1]} for k, v in settings_dict.items()]
-    pd.DataFrame(data).to_csv(SETTINGS_FILE, index=False)
+@st.cache_data(ttl=10)
+def load_all() -> list:
+    res = sb.table("roster").select("*").execute()
+    return res.data or []
+
+def save_row(monday: date, position: str, shift: str, assignments: list):
+    data = {
+        "week_monday": monday.isoformat(),
+        "position":    position,
+        "shift":       shift,
+        "assignments": json.dumps(assignments, ensure_ascii=False),
+    }
+    sb.table("roster").upsert(data, on_conflict="week_monday,position,shift").execute()
     st.cache_data.clear()
 
-def load_assignments(file_id):
-    path = os.path.join(DB_DIR, f"{file_id}.csv")
-    if os.path.exists(path):
-        return pd.read_csv(path).set_index('key')['name'].to_dict()
-    return {}
+def delete_row(monday: date, position: str, shift: str):
+    sb.table("roster")\
+      .delete()\
+      .eq("week_monday", monday.isoformat())\
+      .eq("position", position)\
+      .eq("shift", shift)\
+      .execute()
+    st.cache_data.clear()
 
-def save_assignments(file_id, data):
-    path = os.path.join(DB_DIR, f"{file_id}.csv")
-    df = pd.DataFrame([{"key": k, "name": v} for k, v in data.items()])
-    df.to_csv(path, index=False)
+# ─────────────────────────────────────────────
+# ASSIGNMENTS DISPLAY
+# ─────────────────────────────────────────────
+def assignments_display(assignments: list) -> str:
+    if not assignments:
+        return "—"
+    return " / ".join(
+        f"{a['name']} ({a['from']}–{a['to']})" if a.get("from") and a.get("to") else a.get("name", "")
+        for a in assignments
+    )
 
-def global_search_soldier(name):
-    all_results = []
-    current_monday_str = get_monday_to_monday(datetime.now())[2]
-    if not os.path.exists(DB_DIR): return pd.DataFrame()
-    for filename in os.listdir(DB_DIR):
-        if filename.endswith(".csv"):
-            date_str = filename.replace(".csv", "")
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-            m1, m2, _ = get_monday_to_monday(dt)
-            df = pd.read_csv(os.path.join(DB_DIR, filename), usecols=['key', 'name'])
-            matches = df[df['name'].str.contains(name, na=False, case=False)]
-            for _, row in matches.iterrows():
-                parts = row['key'].split(' | ')
-                status = "נוכחי" if date_str == current_monday_str else ("בוצע" if date_str < current_monday_str else "מתוכנן")
-                all_results.append({
-                    "טווח תאריכים": f"{m1} - {m2}",
-                    "עמדה": parts[0],
-                    "שעות/סבב": parts[1] if len(parts) > 1 else "שיבוץ כללי",
-                    "סטטוס": status,
-                    "סדר": date_str
-                })
-    return pd.DataFrame(all_results)
+# ─────────────────────────────────────────────
+# SESSION STATE INIT
+# ─────────────────────────────────────────────
+defaults = {
+    "week_offset": 0,
+    "is_admin": False,
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-# --- ניהול מצב הניווט (Session State) ---
-if 'current_date' not in st.session_state:
-    st.session_state.current_date = datetime.now()
-if 'admin_mode' not in st.session_state:
-    st.session_state.admin_mode = False
+current_monday = get_week_monday(date.today()) + timedelta(weeks=st.session_state.week_offset)
+week_dates = get_week_dates(current_monday)
 
-# --- Sidebar ---
+# ─────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────
 with st.sidebar:
-    st.header("🔐 אזור ניהול")
-    if not st.session_state.admin_mode:
-        pwd = st.text_input("סיסמת מנהל:", type="password")
-        if st.button("התחבר"):
-            if pwd == ADMIN_PASSWORD:
-                st.session_state.admin_mode = True
-                st.rerun()
-    else:
-        if st.button("יציאה מניהול"):
-            st.session_state.admin_mode = False
+    st.markdown("## 🛡️ מערכת תורנויות")
+    st.markdown("---")
+
+    st.markdown("### 📅 ניווט שבוע")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("◀ קודם", use_container_width=True):
+            st.session_state.week_offset -= 1
             st.rerun()
-    
-    st.divider()
-    st.header("📅 ניווט בשבועות")
-    
-    # כפתור חזרה להיום
-    if st.button("🏠 חזרה לשבוע הנוכחי"):
-        st.session_state.current_date = datetime.now()
-        st.rerun()
-        
-    # חיצי ניווט
-    col_prev, col_next = st.columns(2)
-    if col_prev.button("⬅️ שבוע קודם"):
-        st.session_state.current_date -= timedelta(days=7)
-        st.rerun()
-    if col_next.button("שבוע הבא ➡️"):
-        st.session_state.current_date += timedelta(days=7)
-        st.rerun()
-    
-    # לוח שנה (לגיבוי)
-    st.session_state.current_date = st.date_input("בחר תאריך ספציפי:", st.session_state.current_date)
-    
-    start_date, end_date, file_id = get_monday_to_monday(st.session_state.current_date)
-    
-    # בדיקה האם השבוע עתידי
-    current_monday_val = datetime.now() - timedelta(days=datetime.now().weekday())
-    selected_monday_val = datetime.strptime(file_id, "%Y-%m-%d")
-    is_future = selected_monday_val > current_monday_val
+    with c2:
+        if st.button("היום", use_container_width=True):
+            st.session_state.week_offset = 0
+            st.rerun()
+    with c3:
+        if st.button("הבא ▶", use_container_width=True):
+            st.session_state.week_offset += 1
+            st.rerun()
 
-# --- תוכן ראשי ---
-st.title("📅 מערכת תורנויות")
+    st.markdown(f"""
+    <div class="week-nav">
+        <div class="week-label">שבוע מוצג</div>
+        <div class="week-dates">{fmt(week_dates[0])} – {fmt(week_dates[6])}</div>
+    </div>""", unsafe_allow_html=True)
 
-# חיפוש אישי
-search_name = st.text_input("🔍 חיפוש אישי (שם מלא):")
-if search_name:
-    res = global_search_soldier(search_name)
-    if not res.empty:
-        st.dataframe(res.sort_values("סדר", ascending=False).drop(columns=["סדר"]), use_container_width=True, hide_index=True)
+    st.markdown("---")
+    st.markdown("### 🔐 כניסת מנהל")
+    if not st.session_state.is_admin:
+        pwd = st.text_input("סיסמה", type="password")
+        if st.button("כניסה", use_container_width=True):
+            if pwd == ADMIN_PASSWORD:
+                st.session_state.is_admin = True
+                st.rerun()
+            else:
+                st.error("סיסמה שגויה")
+    else:
+        st.markdown('<span class="admin-badge">✓ מנהל מחובר</span>', unsafe_allow_html=True)
+        if st.button("התנתק", use_container_width=True):
+            st.session_state.is_admin = False
+            st.rerun()
 
-st.divider()
+    st.markdown("---")
+    status = week_status(current_monday)
+    color = {"בוצע": "#4ade80", "נוכחי": "#60a5fa", "מתוכנן": "#fb923c"}.get(status, "#93b4d8")
+    st.markdown(
+        f"**סטטוס:** <span style='color:{color};font-weight:700'>{status}</span>",
+        unsafe_allow_html=True,
+    )
 
-# טאבים
-if st.session_state.admin_mode:
-    t_assign, t_manage = st.tabs(["📝 שיבוץ ורישום", "⚙️ ניהול עמדות"])
-else:
-    t_assign, = st.tabs(["📋 לוח תורנויות שבועי"])
+# ─────────────────────────────────────────────
+# HEADER
+# ─────────────────────────────────────────────
+st.markdown("""
+<div class="main-header">
+    <h1>🛡️ מערכת ניהול תורנויות</h1>
+    <p>גזרה אזרחית • ניהול ורישום משמרות</p>
+</div>
+""", unsafe_allow_html=True)
 
-with t_assign:
-    status_label = "🔮 תכנון עתידי" if is_future else "📅 רישום ביצוע"
-    st.subheader(f"{status_label}: {start_date} עד {end_date}")
-    
-    cur_assigns = load_assignments(file_id)
-    settings = load_settings()
-    
-    if st.session_state.admin_mode:
-        with st.expander("🛠️ כלי שיבוץ"):
-            c_in, _ = st.columns([1, 2])
-            with c_in:
-                names_raw = st.text_area("רשימת שמות (אחד בשורה):")
-                names_list = [n.strip() for n in names_raw.split('\n') if n.strip()]
-                sel_pos = st.selectbox("עמדה:", list(settings.keys()))
-                
-                if not is_future:
-                    h_str, q = settings[sel_pos]
-                    slots = [f"{h.strip()}{' (תורן ' + str(i+1) + ')' if int(q) > 1 else ''}" 
-                             for h in h_str.split(',') for i in range(int(q))]
-                    sel_slot = st.selectbox("בחר סבב שעות:", slots)
-                else:
-                    _, q = settings[sel_pos]
-                    slots = [f"שיבוץ כללי (חייל {i+1})" for i in range(int(q))]
-                    sel_slot = st.selectbox("בחר תקן לשיבוץ:", slots)
-                
-                sel_soldier = st.selectbox("חייל:", names_list if names_list else ["--"])
-                if st.button("שמור"):
-                    cur_assigns[f"{sel_pos} | {sel_slot}"] = sel_soldier
-                    save_assignments(file_id, cur_assigns)
-                    st.rerun()
+# ─────────────────────────────────────────────
+# TABS
+# ─────────────────────────────────────────────
+tab_labels = ["📋 לוח תורנויות", "🔍 חיפוש אישי"]
+if st.session_state.is_admin:
+    tab_labels.append("✏️ שיבוץ")
 
-    # הצגת הטבלה
-    full_table = []
-    for pos, (h_str, q) in settings.items():
-        if not is_future:
-            for h in [x.strip() for x in h_str.split(',')]:
-                for i in range(int(q)):
-                    suffix = f" (תורן {i+1})" if int(q) > 1 else ""
-                    key = f"{pos} | {h}{suffix}"
-                    full_table.append({"עמדה": pos, "שעות/סבב": f"{h}{suffix}", "חייל": cur_assigns.get(key, "---")})
+tabs = st.tabs(tab_labels)
+
+# ══════════════════════════════════════════════
+# TAB 1 — לוח תורנויות
+# ══════════════════════════════════════════════
+with tabs[0]:
+    week_data = load_week(current_monday.isoformat())
+
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-title">📋 לוח תורנויות — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
+        <table class="roster-table">
+            <thead>
+                <tr>
+                    <th>עמדה</th>
+                    <th>סבב / שעות</th>
+                    <th>חייל</th>
+                </tr>
+            </thead>
+            <tbody>
+    """, unsafe_allow_html=True)
+
+    prev_pos = None
+    rows_html = ""
+    for position, shift in ROSTER_ROWS:
+        key = row_key(position, shift)
+        asgns = week_data.get(key, [])
+        disp = assignments_display(asgns)
+        pos_display = position if position != prev_pos else ""
+        prev_pos = position
+        rows_html += f"""
+            <tr>
+                <td class="pos-cell">{pos_display}</td>
+                <td class="shift-cell">{shift}</td>
+                <td>{disp}</td>
+            </tr>
+        """
+
+    st.markdown(rows_html + "</tbody></table></div>", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════
+# TAB 2 — חיפוש אישי
+# ══════════════════════════════════════════════
+with tabs[1]:
+    st.markdown(
+        '<div class="card"><div class="card-title">🔍 חיפוש תורנויות לפי שם</div>',
+        unsafe_allow_html=True,
+    )
+    search_name = st.text_input("הזן שם מלא או חלקי", placeholder="לדוגמה: כהן")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if search_name.strip():
+        all_rows = load_all()
+        found = []
+        q = search_name.strip().lower()
+
+        for r in all_rows:
+            try:
+                asgns = json.loads(r["assignments"])
+            except Exception:
+                continue
+            monday = date.fromisoformat(r["week_monday"])
+            for a in asgns:
+                if q in a.get("name", "").lower():
+                    frm = a.get("from", "")
+                    to = a.get("to", "")
+                    period = f"{frm}–{to}" if frm and to else "כל השבוע"
+                    found.append({
+                        "שבוע":   f"{fmt(monday)} – {fmt(monday + timedelta(days=6))}",
+                        "עמדה":   r["position"],
+                        "סבב":    r["shift"],
+                        "תקופה":  period,
+                        "סטטוס":  week_status(monday),
+                        "_monday": monday,
+                    })
+
+        if not found:
+            st.markdown(
+                f'<div class="error-box">לא נמצאו תורנויות עבור "{search_name}".</div>',
+                unsafe_allow_html=True,
+            )
         else:
-            for i in range(int(q)):
-                key = f"{pos} | שיבוץ כללי (חייל {i+1})"
-                full_table.append({"עמדה": pos, "שעות/סבב": f"תקן {i+1} (כללי)", "חייל": cur_assigns.get(key, "---")})
-    
-    st.table(pd.DataFrame(full_table))
+            st.markdown(
+                f'<div class="success-box">נמצאו {len(found)} תורנויות עבור "{search_name}"</div>',
+                unsafe_allow_html=True,
+            )
+            table_html = """
+            <div class="card">
+                <table class="roster-table">
+                    <thead>
+                        <tr>
+                            <th>שבוע</th>
+                            <th>עמדה</th>
+                            <th>סבב</th>
+                            <th>תקופה</th>
+                            <th>סטטוס</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            """
+            for f in sorted(found, key=lambda x: x["_monday"], reverse=True):
+                bc = {
+                    "בוצע": "badge-done",
+                    "נוכחי": "badge-now",
+                    "מתוכנן": "badge-plan",
+                }.get(f["סטטוס"], "badge-now")
+                table_html += (
+                    f"<tr>"
+                    f"<td>{f['שבוע']}</td>"
+                    f"<td>{f['עמדה']}</td>"
+                    f"<td>{f['סבב']}</td>"
+                    f"<td>{f['תקופה']}</td>"
+                    f"<td><span class='badge {bc}'>{f['סטטוס']}</span></td>"
+                    f"</tr>"
+                )
+            table_html += "</tbody></table></div>"
+            st.markdown(table_html, unsafe_allow_html=True)
 
-if st.session_state.admin_mode:
-    with t_manage:
-        st.subheader("ניהול עמדות קבועות")
-        # כלי הוספה
-        with st.expander("➕ הוסף עמדה חדשה"):
-            c1, c2, c3 = st.columns([2, 3, 1])
-            n_name = c1.text_input("שם עמדה:")
-            n_hours = c2.text_input("שעות (למשל 02-06, 06-10):")
-            n_qty = c3.number_input("כמות תורנים:", min_value=1, value=1)
-            if st.button("הוסף"):
-                s = load_settings(); s[n_name] = [n_hours, n_qty]; save_settings(s); st.rerun()
-        
-        # עריכת קיימות
-        curr_s = load_settings()
-        for s_name in list(curr_s.keys()):
-            cols = st.columns([2, 4, 1, 0.5])
-            h, q = curr_s[s_name]
-            new_h = cols[1].text_input(f"שעות {s_name}", value=h, key=f"h_{s_name}")
-            new_q = cols[2].number_input(f"תקן {s_name}", value=int(q), min_value=1, key=f"q_{s_name}")
-            if new_h != h or new_q != q:
-                curr_s[s_name] = [new_h, new_q]; save_settings(curr_s)
-            if cols[3].button("🗑️", key=f"d_{s_name}"):
-                del curr_s[s_name]; save_settings(curr_s); st.rerun()
+# ══════════════════════════════════════════════
+# TAB 3 — שיבוץ (מנהל)
+# ══════════════════════════════════════════════
+if st.session_state.is_admin:
+    with tabs[2]:
+        week_data = load_week(current_monday.isoformat())
+        future = is_future(current_monday)
+
+        st.markdown(f"""
+        <div class="card">
+            <div class="card-title">✏️ שיבוץ שבועי — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if future:
+            st.markdown(
+                '<div class="info-box">📅 שבוע עתידי — שיבוץ לתכנון</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("#### בחר עמדה וסבב לשיבוץ")
+        row_options = [f"{pos} | {shft}" for pos, shft in ROSTER_ROWS]
+        selected_row_str = st.selectbox("עמדה | סבב", row_options, key="row_select")
+        sel_idx = row_options.index(selected_row_str)
+        sel_pos, sel_shift = ROSTER_ROWS[sel_idx]
+        sel_key = row_key(sel_pos, sel_shift)
+        current_assignments = week_data.get(sel_key, [])
+
+        if current_assignments:
+            st.markdown(
+                f'<div class="info-box">שיבוץ נוכחי: <strong>{assignments_display(current_assignments)}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="info-box">אין שיבוץ לסבב זה עדיין</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
+
+        use_split = st.toggle("פיצול שמירה (יותר מחייל אחד בסבב זה)", value=False)
+        new_assignments = []
+        split_valid = True
+
+        if not use_split:
+            st.markdown("#### שיבוץ לכל השבוע")
+            soldier = st.text_input("שם החייל", key="single_soldier")
+            if soldier.strip():
+                new_assignments = [{"name": soldier.strip()}]
+        else:
+            st.markdown("#### שיבוץ עם פיצול")
+            num_splits = st.number_input(
+                "כמה חיילים בפיצול?",
+                min_value=2,
+                max_value=7,
+                value=2,
+                step=1,
+            )
+
+            day_options = [f"{DAYS_HE[j]} {fmt(week_dates[j])}" for j in range(7)]
+
+            for i in range(int(num_splits)):
+                st.markdown(f"**חייל {i+1}:**")
+                sc1, sc2, sc3 = st.columns(3)
+                with sc1:
+                    sname = st.text_input(f"שם", key=f"split_name_{i}")
+                with sc2:
+                    from_day = st.selectbox(
+                        "מתאריך",
+                        day_options,
+                        key=f"split_from_{i}",
+                        index=min(i, 6),
+                    )
+                with sc3:
+                    to_day = st.selectbox(
+                        "עד תאריך",
+                        day_options,
+                        key=f"split_to_{i}",
+                        index=min(i + 1, 6),
+                    )
+
+                from_idx = day_options.index(from_day)
+                to_idx = day_options.index(to_day)
+
+                if to_idx < from_idx:
+                    st.markdown(
+                        '<div class="error-box">⚠️ תאריך הסיום חייב להיות אחרי תאריך ההתחלה</div>',
+                        unsafe_allow_html=True,
+                    )
+                    split_valid = False
+
+                if sname.strip():
+                    new_assignments.append({
+                        "name": sname.strip(),
+                        "from": fmt(week_dates[from_idx]),
+                        "to":   fmt(week_dates[to_idx]),
+                    })
+                else:
+                    split_valid = False
+
+            if not split_valid and any(a.get("name") for a in new_assignments):
+                st.markdown(
+                    '<div class="error-box">מלא את כל השדות לפני השמירה</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("---")
+
+        btn1, btn2 = st.columns(2)
+        with btn1:
+            if st.button("💾 שמור שיבוץ", use_container_width=True, type="primary"):
+                if not new_assignments:
+                    st.error("יש למלא לפחות חייל אחד")
+                elif use_split and not split_valid:
+                    st.error("יש לתקן את שדות הפיצול לפני השמירה")
+                else:
+                    save_row(current_monday, sel_pos, sel_shift, new_assignments)
+                    st.markdown(
+                        f'<div class="success-box">✅ נשמר: {assignments_display(new_assignments)}</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.rerun()
+        with btn2:
+            if st.button("🗑️ נקה שיבוץ", use_container_width=True):
+                delete_row(current_monday, sel_pos, sel_shift)
+                st.success("השיבוץ נמחק")
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("#### סיכום שיבוצים לשבוע זה")
+        week_data = load_week(current_monday.isoformat())
+
+        table_html = """
+        <div class="card">
+            <table class="roster-table">
+                <thead>
+                    <tr>
+                        <th>עמדה</th>
+                        <th>סבב</th>
+                        <th>חייל</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        prev_p = None
+        for position, shift in ROSTER_ROWS:
+            key = row_key(position, shift)
+            asgns = week_data.get(key, [])
+            disp = assignments_display(asgns)
+            if disp == "—":
+                continue
+            pos_d = position if position != prev_p else ""
+            prev_p = position
+            table_html += (
+                f"<tr>"
+                f"<td class='pos-cell'>{pos_d}</td>"
+                f"<td class='shift-cell'>{shift}</td>"
+                f"<td>{disp}</td>"
+                f"</tr>"
+            )
+        table_html += "</tbody></table></div>"
+        st.markdown(table_html, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────
+# FOOTER
+# ─────────────────────────────────────────────
+st.markdown("---")
+st.markdown(
+    '<div style="text-align:center;color:rgba(255,255,255,.25);font-size:.78rem;padding:10px 0">'
+    'מערכת ניהול תורנויות • גזרה אזרחית'
+    '</div>',
+    unsafe_allow_html=True,
+)
