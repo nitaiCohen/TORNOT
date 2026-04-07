@@ -368,7 +368,40 @@ with tabs[1]:
                 unsafe_allow_html=True,
             )
 
-            
+            table_html = """
+            <div class="card">
+            <table class="roster-table">
+            <thead>
+                <tr>
+                    <th>שבוע</th>
+                    <th>עמדה</th>
+                    <th>סבב</th>
+                    <th>תקופה</th>
+                    <th>סטטוס</th>
+                </tr>
+            </thead>
+            <tbody>
+            """
+
+            for f in sorted(found, key=lambda x: x["_monday"], reverse=True):
+                bc = {
+                    "בוצע": "badge-done",
+                    "נוכחי": "badge-now",
+                    "מתוכנן": "badge-plan",
+                }[f["סטטוס"]]
+
+                table_html += f"""
+                <tr>
+                    <td>{f['שבוע']}</td>
+                    <td>{f['עמדה']}</td>
+                    <td>{f['סבב']}</td>
+                    <td>{f['תקופה']}</td>
+                    <td><span class='badge {bc}'>{f['סטטוס']}</span></td>
+                </tr>
+                """
+
+            table_html += "</tbody></table></div>"
+            st.markdown(table_html, unsafe_allow_html=True)
             # ══════════════════════════════════════════════
 # TAB 3 — שיבוץ (מנהל)
 # ══════════════════════════════════════════════
