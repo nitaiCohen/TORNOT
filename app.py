@@ -282,43 +282,42 @@ with tabs[0]:
     week_data = load_week(current_monday.isoformat())
 
     table_html = f"""
-<div class="card">
-<div class="card-title">📋 לוח תורנויות — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
-<table class="roster-table">
-<thead>
-    <tr>
-        <th>עמדה</th>
-        <th>סבב / שעות</th>
-        <th>חייל</th>
-    </tr>
-</thead>
-<tbody>
-"""
-
-prev_pos = None
-for position, shift in ROSTER_ROWS:
-    key = row_key(position, shift)
-    asgns = week_data.get(key, [])
-    disp = assignments_display(asgns)
-    pos_display = position if position != prev_pos else ""
-    prev_pos = position
-
-    table_html += f"""
-    <tr>
-        <td class="pos-cell">{pos_display}</td>
-        <td class="shift-cell">{shift}</td>
-        <td>{disp}</td>
-    </tr>
+    <div class="card">
+    <div class="card-title">📋 לוח תורנויות — {fmt(week_dates[0])} עד {fmt(week_dates[6])}</div>
+    <table class="roster-table">
+    <thead>
+        <tr>
+            <th>עמדה</th>
+            <th>סבב / שעות</th>
+            <th>חייל</th>
+        </tr>
+    </thead>
+    <tbody>
     """
 
-table_html += """
-</tbody>
-</table>
-</div>
-"""
+    prev_pos = None
+    for position, shift in ROSTER_ROWS:
+        key = row_key(position, shift)
+        asgns = week_data.get(key, [])
+        disp = assignments_display(asgns)
+        pos_display = position if position != prev_pos else ""
+        prev_pos = position
 
-st.markdown(table_html, unsafe_allow_html=True)
+        table_html += f"""
+        <tr>
+            <td class="pos-cell">{pos_display}</td>
+            <td class="shift-cell">{shift}</td>
+            <td>{disp}</td>
+        </tr>
+        """
 
+    table_html += """
+    </tbody>
+    </table>
+    </div>
+    """
+
+    st.markdown(table_html, unsafe_allow_html=True)
 # ══════════════════════════════════════════════
 # TAB 2 — חיפוש אישי
 # ══════════════════════════════════════════════
