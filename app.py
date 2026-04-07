@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import timedelta, date
 from supabase import create_client, Client
@@ -220,6 +221,19 @@ html, body, [class*="css"] {
 
 st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
 
+def render_table(html: str, rows: int = 20):
+    """Render an HTML table using components.html so Streamlit doesn't strip tags."""
+    full = f"""
+    <style>
+    body {{ margin:0; padding:0; background:transparent; font-family:'Heebo',sans-serif; direction:rtl; }}
+    {CSS}
+    </style>
+    {html}
+    """
+    components.html(full, height=max(rows * 38 + 80, 120), scrolling=True)
+
+
+
 # ─────────────────────────────────────────────
 # SUPABASE CLIENT
 # ─────────────────────────────────────────────
@@ -429,7 +443,7 @@ with tabs[0]:
     </div>
     """
 
-    st.markdown(table_html, unsafe_allow_html=True)
+    render_table(table_html, rows=len(ROSTER_ROWS))
     # ══════════════════════════════════════════════
 # TAB 2 — חיפוש אישי
 # ══════════════════════════════════════════════
@@ -513,7 +527,7 @@ with tabs[1]:
                 """
 
             table_html += "</tbody></table></div>"
-            st.markdown(table_html, unsafe_allow_html=True)
+            render_table(table_html, rows=len(found))
 
 # ══════════════════════════════════════════════
 # TAB 3 — שיבוץ (מנהל)
@@ -619,7 +633,7 @@ if st.session_state.is_admin:
             """
 
         summary_html += "</tbody></table></div>"
-        st.markdown(summary_html, unsafe_allow_html=True)
+        render_table(summary_html, rows=len(ROSTER_ROWS))
 
 # ─────────────────────────────────────────────
 # FOOTER
