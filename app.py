@@ -448,7 +448,7 @@ if st.session_state.is_admin:
         use_split = st.toggle("פיצול שמירה (יותר מחייל אחד בסבב זה)", value=False)
         new_assignments = []
         split_valid = True
-                st.markdown("---")
+        st.markdown("---")
 
         btn1, btn2 = st.columns(2)
 
